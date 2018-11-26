@@ -79,7 +79,7 @@ class SavecairClient:
         """Callback for when the socket is disconnected."""
         _LOGGER.debug("Disconnected from server")
         if self.retry:
-            await self.loop.sleep(RETRY_TIMER)
+            await asyncio.sleep(RETRY_TIMER)
             await self._connect()
 
     async def _on_update(self):
@@ -126,6 +126,7 @@ class SavecairClient:
                     _LOGGER.error("Message from server is not JSON: %s", error)
                     continue
 
+
                 if data["type"] == "LOGGED_IN":
                     _LOGGER.debug("Client connected to server.")
                     _ = [await _() for _ in self.on_connect]  # Call on_update callbacks
@@ -144,6 +145,8 @@ class SavecairClient:
 
                     self.data.update(values)
                     _ = [await _() for _ in self.on_update]  # Call on_update callbacks
+                elif data["type"] == "ERROR":
+                    _LOGGER.error(data)
 
             except websockets.exceptions.ConnectionClosed:
                 _LOGGER.error('Connection to WS server was closed!')
@@ -155,7 +158,7 @@ class SavecairClient:
         if self.connection is None or not self.connection.open:
             _LOGGER.warning("Tried to send query when connection does not exists!")
             return False
-
+        print(str(data))
         await self.connection.send(str(data))
 
     def get(self, key):
@@ -172,67 +175,67 @@ class SavecairClient:
     async def set_manual_mode(self):
         """Set the ventilation unit in manual mode."""
         await self.send(Write(dict(
-            mode_change_request=11
+            mode_change_request="1"
         )))
 
     async def set_crowded_mode(self):
         """Set the ventilation unit in crowded mode."""
         await self.send(Write(dict(
             user_mode_crowded_duration=8,
-            mode_change_request=2
+            mode_change_request="2"
         )))
 
     async def set_refresh_mode(self):
         """Set the ventilation unit in refresh mode."""
         await self.send(Write(dict(
             user_mode_refresh_duration=240,
-            mode_change_request=3
+            mode_change_request="3"
         )))
 
     async def set_fireplace_mode(self):
         """Set the ventilation unit in fireplace mode."""
         await self.send(Write(dict(
             user_mode_fireplace_duration=60,
-            mode_change_request=4
+            mode_change_request="4"
         )))
 
     async def set_holiday_mode(self):
         """Set the ventilation unit in holiday mode."""
         await self.send(Write(dict(
             user_mode_holiday_duration=365,
-            mode_change_request=6
+            mode_change_request="6"
         )))
 
     async def set_auto_mode(self):
         """Set the ventilation unit in auto mode."""
-        await self.send(Write(dict(mode_change_request=0)))
+        await self.send(Write(dict(mode_change_request="0")))
 
     async def set_away_mode(self):
         """Set the ventilation unit in away mode."""
         await self.send(Write(dict(
             user_mode_away_duration=72,
-            mode_change_request=5
+            mode_change_request="5"
         )))
 
     async def set_fan_off(self):
         """Set the fan speed to off."""
-        await self.send(Write(dict(main_airflow=1)))
+        await self.send(Write(dict(main_airflow="1")))
 
     async def set_fan_low(self):
         """Set the fan speed to low."""
-        await self.send(Write(dict(main_airflow=2)))
+        await self.send(Write(dict(main_airflow="2")))
 
     async def set_fan_normal(self):
         """Set the fan speed to normal."""
-        await self.send(Write(dict(main_airflow=3)))
+        await self.send(Write(dict(main_airflow="3")))
 
     async def set_fan_high(self):
         """Set the fan speed to high."""
-        await self.send(Write(dict(main_airflow=4)))
+        await self.send(Write(dict(main_airflow="4")))
 
     async def update_sensors(self):
         """Update available sensors via the API."""
-        await self.send(Write(self.params))
+        await self.send(Read(self.params))
 
     async def set_operation_mode(self, operation_mode):
         if operation_mode.lower() == "auto":
