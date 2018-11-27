@@ -8,6 +8,8 @@ import os
 import socket
 import websockets
 
+from systemair.savecair import parameters
+from systemair.savecair import parameter_processing
 from systemair.savecair.cmd import Login, Read, Write
 
 logging.basicConfig(level=logging.DEBUG)
@@ -67,6 +69,9 @@ class SavecairClient:
         """Load parameters from file or arguments."""
         self.params = params if isinstance(params, list) else list(self._load_parameters())
 
+        """Load post processing for parameters."""
+        self.params_post = {x_k: x_v for x_k, x_v in parameter_processing.__dict__.items() if not x_k.startswith("__")}
+
     def start(self):
         self.loop.create_task(self._connect())
 
@@ -106,13 +111,24 @@ class SavecairClient:
 
     def _load_parameters(self):
         """Function for loading the parameter list."""
-        for param in open(os.path.join(DIR_PATH, "parameters.txt")).read().splitlines():
-            param = param.split("#")[0]  # Remove comments
-            param = param.strip()  # Remove whitespaces
-            if not param:
-                # Remove empty lines
+        for param_name, param_value in parameters.__dict__.items():
+            if param_name.startswith("__"):
                 continue
-            yield param
+            yield param_name
+
+    def post_process_data(self):
+
+        for x_k, x_v in self.params_post.items():
+
+            """Global filter iteration."""
+            if x_k.startswith("global_"):
+                for d_k, d_v in self.data.items():
+                    self.data[d_k] = x_v(d_v)
+
+            """Specific filter iteration."""
+            if x_k in self.data:
+                self.data[x_k] = x_v(self.data[x_k])
+
 
     async def _handler(self):
         """"Websocket handler which receives messages."""
@@ -125,7 +141,6 @@ class SavecairClient:
                 except ValueError as error:
                     _LOGGER.error("Message from server is not JSON: %s", error)
                     continue
-
 
                 if data["type"] == "LOGGED_IN":
                     _LOGGER.debug("Client connected to server.")
@@ -144,6 +159,7 @@ class SavecairClient:
                         continue
 
                     self.data.update(values)
+                    self.post_process_data()
                     _ = [await _() for _ in self.on_update]  # Call on_update callbacks
                 elif data["type"] == "ERROR":
                     _LOGGER.error(data)
@@ -158,7 +174,6 @@ class SavecairClient:
         if self.connection is None or not self.connection.open:
             _LOGGER.warning("Tried to send query when connection does not exists!")
             return False
-        print(str(data))
         await self.connection.send(str(data))
 
     def get(self, key):
@@ -274,3 +289,5 @@ class SavecairClient:
             return USER_MODES[opcode]
         except KeyError:
             return None
+
+
