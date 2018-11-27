@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='python-systemair-savecair',
-    version='1.0.0',
+    version='1.0.1',
     author="Per-Arne Andersen",
     author_email="per@sysx.no",
     description="A Systemair-savecair API Wrapper",
