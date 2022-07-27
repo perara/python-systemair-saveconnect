@@ -21,6 +21,9 @@ dependencies = [
 ]
 dynamic = ["version", "readme"]
 
+[tool.distutils.bdist_wheel]
+universal = true
+
 [tool.setuptools_scm]
 write_to = "systemair/VERSION.py"
 
