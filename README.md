@@ -36,5 +36,5 @@ device_0_data = await sc.read_data(device_id=device_0)
 ```
 
 # Version History
-3.0.0 - Updated to work with SaveConnect
-1.0.0 - Initial Version
+* 3.0.0 - Updated to work with SaveConnect
+* 1.0.0 - Initial Version
