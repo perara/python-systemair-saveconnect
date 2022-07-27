@@ -1,1 +1,5 @@
-websockets
+aiohttp==3.8.1
+gql[all]==3.4.0
+python-keycloak==2.1.1
+beautifulsoup4==4.11.1
+httpx==0.23.0

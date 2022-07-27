@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-systemair-saveconnect"
+description = "A python interface for the SaveConnect API"
+requires-python = ">=3.7"
+keywords = ["systemair", "saveconnect", "home-automation"]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "aiohttp==3.8.1",
+    "gql[all]==3.4.0",
+    "python-keycloak==2.1.1",
+    "beautifulsoup4==4.11.1",
+    "httpx==0.23.0",
+    "importlib-metadata"
+]
+dynamic = ["version", "readme"]
+
+[tool.setuptools_scm]
+write_to = "systemair/VERSION.py"
+
+[tool.setuptools.dynamic]
+version = {attr = "systemair.VERSION.__version__"}
+readme = {file = ["README.md"]}
+
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["systemair*"]  # package names should match these glob patterns (["*"] by default)
+exclude = [
+    "node_modules*",
+    "scripts*",
+    "tests*",
+    "venv*"
+]  # exclude packages matching these glob patterns (empty by default)
+namespaces = false  # to disable scanning PEP 420 namespaces (true by default)

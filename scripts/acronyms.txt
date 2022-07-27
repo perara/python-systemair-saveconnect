@@ -1,0 +1,13 @@
+OAT - Outdoor Air Temperature
+EAT - Extract Air Temperature
+RHS - Relative Humidity S
+FPT - Frost Protection Temperature
+SAT - Supply AIR Temperature
+RAT - Room Air Temperature
+ECT - Extra Controller Temperature
+EFT -
+OHT - Overheating Sensor
+BYS -
+EMT -
+RGS -
+CO2S -

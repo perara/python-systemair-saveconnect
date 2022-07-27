@@ -1,43 +1,40 @@
-# python-systemair-savecair
+# python-systemair-saveconnect
 
-This is a simple package that expose the savecair API as a python module.
+This is a simple package that expose the SaveConnect API as a python module.
 
 # Installation
 ```python
-pip install python-systemair-savecair
+pip install python-systemair-saveconnect
 ```
 
 # Example
+
 ```python
-from systemair.savecair.client import SavecairClient
-import asyncio
-if __name__ == "__main__":
+from systemair.saveconnect import SaveConnect
+email = ""
+password = ""
 
-    async def on_connect():
-        pass
+sc = SaveConnect(
+    email=email,
+    password=password,
+    ws_enabled=True,
+    update_interval=60,
+    refresh_token_interval=300
+)
 
-    async def on_disconnect():
-        pass
+# Authenticate
+if not await sc.login():
+    raise RuntimeError("Could not connect to systemAIR")
 
-    async def on_update():
-        pass
+# Refresh Token
+await sc.auth.refresh_token()
 
-    async def on_error():
-        pass
+devices = await sc.get_devices()
+device_0 = devices[0]["identifier"]
 
-    async def start(loop=asyncio.get_event_loop()):
-        x = SavecairClient(iam_id="xxxxx", password="xxxxx", loop=loop)
-        x.on_connect.append(on_connect)
-        x.on_disconnect.append(on_disconnect)
-        x.on_update.append(on_update)
-        x.on_error.append(on_error)
-
-        x.start()
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start(loop))
-    loop.run_forever()
+device_0_data = await sc.read_data(device_id=device_0)
 ```
 
 # Version History
+3.0.0 - Updated to work with SaveConnect
 1.0.0 - Initial Version
