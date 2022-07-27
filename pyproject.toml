@@ -29,7 +29,7 @@ write_to = "systemair/VERSION.py"
 
 [tool.setuptools.dynamic]
 version = {attr = "systemair.VERSION.__version__"}
-readme = {file = ["README.md"]}
+readme = {file = ["README.rst"]}
 
 [tool.setuptools.packages.find]
 where = ["."]  # list of folders that contain the packages (["."] by default)
