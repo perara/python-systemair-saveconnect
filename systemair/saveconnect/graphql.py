@@ -1,4 +1,5 @@
 import json
+import logging
 import typing
 
 from gql import gql, Client
@@ -7,6 +8,9 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from systemair.saveconnect.data import SaveConnectData
 from systemair.saveconnect.models import SaveConnectDevice
 from systemair.saveconnect.registry import RegisterWrite
+from .const import APIRoutes
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SaveConnectGraphQL:
@@ -81,9 +85,6 @@ class SaveConnectGraphQL:
             device_id=device_id,
             route=f"/device/home{'' if not change_mode else '/changeMode'}"
         )
-
-
-
         return success
 
     async def queryGetAccount(self) -> typing.List['SaveConnectDevice']:
@@ -149,3 +150,21 @@ class SaveConnectGraphQL:
             self.data.update_device(device_data=device_data)
 
         return list(self.data.devices.values())
+
+    async def queryDeviceInfo(self, device: SaveConnectDevice):
+        statuses = []
+        for route in [
+            APIRoutes.VIEWS_UNIT_INFORMATION_COMPONENTS_DESC,
+            APIRoutes.VIEWS_UNIT_INFORMATION_SENSORS_DESC,
+            APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_INPUT_STATUS_DESC,
+            APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_OUTPUT_STATUS_DESC,
+            APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_DATE_TIME_TITLE,
+            APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_VERSION_DESC
+        ]:
+            status = await self.queryDeviceView(device.identifier, route)
+
+            if not status:
+                _LOGGER.error(f"queryDeviceInfo failed for route={route}")
+            statuses.append(status)
+
+        return all(statuses)

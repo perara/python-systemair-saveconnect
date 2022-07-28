@@ -43,7 +43,7 @@ class SaveConnectAuth:
         ), follow_redirects=True)
 
         # Get Access Token With Code
-        self._oidc_token = await self.loop.run_in_executor(None, lambda : keycloak_openid.token(
+        self._oidc_token = await self.loop.run_in_executor(None, lambda: keycloak_openid.token(
             grant_type='authorization_code',
             code=r2.url.params["code"],
             redirect_uri="https://homesolutions.systemair.com"))
@@ -53,9 +53,9 @@ class SaveConnectAuth:
     async def refresh_token(self):
         keycloak_openid = await self.auth_openid()
 
-        self._oidc_token = keycloak_openid.refresh_token(
+        self._oidc_token = await self.loop.run_in_executor(None, lambda: keycloak_openid.refresh_token(
             grant_type='refresh_token',
-            refresh_token=self._oidc_token["refresh_token"])
+            refresh_token=self._oidc_token["refresh_token"]))
 
     def is_auth(self):
         return len(self._oidc_token) > 0

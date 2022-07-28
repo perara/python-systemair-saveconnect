@@ -30,3 +30,12 @@ class UserModes:
     FIREPLACE = "fireplace"
     AWAY = "away"
     HOLIDAY = "holiday"
+
+class APIRoutes:
+
+    VIEWS_UNIT_INFORMATION_COMPONENTS_DESC = "/device/unit_information/components"
+    VIEWS_UNIT_INFORMATION_SENSORS_DESC = "/device/unit_information/sensors"
+    VIEWS_UNIT_INFORMATION_UNIT_INPUT_STATUS_DESC = "/device/unit_information/input_status"
+    VIEWS_UNIT_INFORMATION_UNIT_OUTPUT_STATUS_DESC = "/device/unit_information/output_status"
+    VIEWS_UNIT_INFORMATION_UNIT_DATE_TIME_TITLE = "/device/unit_information/date_time"
+    VIEWS_UNIT_INFORMATION_UNIT_VERSION_DESC = "/device/unit_information/unit_version"

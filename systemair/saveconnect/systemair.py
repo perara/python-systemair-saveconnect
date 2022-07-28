@@ -248,7 +248,7 @@ class SaveConnect:
         )
         return data
 
-    async def get_devices(self, update=True) -> typing.List[SaveConnectDevice]:
+    async def get_devices(self, update=True, fetch_device_info=True) -> typing.List[SaveConnectDevice]:
         """
         Retrieve all devices from the account query
         @return:
@@ -256,5 +256,10 @@ class SaveConnect:
         if not update:
             return list(self.data.devices.values())
         devices = await self.graphql.queryGetAccount()
+
+        for device in devices:
+            if fetch_device_info:
+                await self.graphql.queryDeviceInfo(device)
+
         return devices
 
