@@ -1,5 +1,5 @@
 
-
+"""
 class Register:
     USER_MODE_READ = 1164
     USER_MODE_WRITE = 1161
@@ -12,6 +12,7 @@ class Register:
     AIRFLOW_WRITE = 1130
     TEMPERATURE_ECO_MODE_WRITE = 2504
     TEMPERATURE_OFFSET = 2000
+"""
 
 
 class Airflow:

@@ -17,6 +17,7 @@ dependencies = [
     "python-keycloak==2.1.1",
     "beautifulsoup4==4.11.1",
     "httpx==0.23.0",
+    "pydantic==1.9.1",
     "importlib-metadata"
 ]
 dynamic = ["version", "readme"]

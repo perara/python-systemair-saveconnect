@@ -5,11 +5,12 @@ from bs4 import BeautifulSoup
 
 class SaveConnectAuth:
 
-    def __init__(self):
+    def __init__(self, loop):
         """HTTP Client"""
         # self._cookie_jar = aiohttp.CookieJar(unsafe=True)
         self._client: httpx.AsyncClient = httpx.AsyncClient()
         self._oidc_token: dict = {}
+        self.loop = loop
 
     async def auth_openid(self):
         return KeycloakOpenID(server_url="https://sso.systemair.com/auth/",
@@ -21,10 +22,10 @@ class SaveConnectAuth:
         keycloak_openid = await self.auth_openid()
 
         # Get Code With Oauth Authorization Request
-        auth_url = keycloak_openid.auth_url(
+        auth_url = await self.loop.run_in_executor(None, lambda : keycloak_openid.auth_url(
             redirect_uri="https://homesolutions.systemair.com",
             scope="openid",
-            state="xyzABC123")  # TODO state
+            state="xyzABC123"))
 
         r1 = await self._client.get(auth_url, follow_redirects=True)
 
@@ -42,10 +43,10 @@ class SaveConnectAuth:
         ), follow_redirects=True)
 
         # Get Access Token With Code
-        self._oidc_token = keycloak_openid.token(
+        self._oidc_token = await self.loop.run_in_executor(None, lambda : keycloak_openid.token(
             grant_type='authorization_code',
             code=r2.url.params["code"],
-            redirect_uri="https://homesolutions.systemair.com")
+            redirect_uri="https://homesolutions.systemair.com"))
 
         return True if self._oidc_token else False
 

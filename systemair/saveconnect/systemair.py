@@ -5,11 +5,14 @@ import asyncio
 import json
 import logging
 import time
+import typing
 
 from .auth import SaveConnectAuth
-from .const import UserModes, Register, Airflow
+from .const import UserModes, Airflow
 from .data import SaveConnectData
 from .graphql import SaveConnectGraphQL
+from .models import SaveConnectDevice
+from .register import Register
 from .registry import RegisterWrite
 from .websocket import WSClient
 
@@ -24,30 +27,30 @@ class SaveConnectTemperature:
         """
         self.sc = client
 
-    async def set_eco_mode(self, device_id, state: bool):
+    async def set_eco_mode(self, device: SaveConnectDevice, state: bool):
         """
         Togle the eco mode according to boolean
-        @param device_id:
+        @param device:
         @param state: bool
         """
         await self.sc.write_data(
-            device_id=device_id,
-            register=RegisterWrite(register=Register.TEMPERATURE_ECO_MODE_WRITE, value=state)
+            device=device,
+            register=RegisterWrite(register=Register.REG_USERMODE_MODE_HMI, value=state)
         )
 
-    async def set_temperature_offset(self, device_id, temperature: int):
+    async def set_temperature_offset(self, device: SaveConnectDevice, temperature: int):
         """
         Set the temperature offset of a device
-        @param device_id:
+        @param device:
         @param temperature: the specified temperature
         """
-        min_value = int(self.sc.data.get(device_id, Register.TEMPERATURE_OFFSET, "min") / 10)
-        max_value = int(self.sc.data.get(device_id, Register.TEMPERATURE_OFFSET, "max") / 10)
+        min_value = int(device.registry.REG_TC_SP["min"] / 10)
+        max_value = int(device.registry.REG_TC_SP["max"] / 10)
 
         if min_value <= temperature <= max_value:
             await self.sc.write_data(
-                device_id=device_id,
-                register=RegisterWrite(register=Register.TEMPERATURE_OFFSET, value=int(temperature * 10))
+                device=device,
+                register=RegisterWrite(register=Register.REG_TC_SP, value=int(temperature * 10))
             )
         else:
             raise RuntimeWarning(
@@ -63,42 +66,42 @@ class SaveConnectUserMode:
         """
         self.sc = client
 
-    async def set_airflow(self, device_id, mode: Airflow):
+    async def set_airflow(self, device, mode: Airflow):
         """
         Set the airflow value. This only works if the mode is "manual"
-        @param device_id:
+        @param device:
         @param mode:
         """
 
         await self.sc.write_data(
-            device_id=device_id,
-            register=RegisterWrite(register=Register.AIRFLOW_WRITE, value=mode)
+            device=device,
+            register=RegisterWrite(register=Register.REG_USERMODE_MANUAL_AIRFLOW_LEVEL_SAF, value=mode)
         )
 
-    async def set_mode(self, device_id, mode: UserModes, duration=60):
+    async def set_mode(self, device, mode: UserModes, duration=60):
         """
         Set the operation mode of the ventilation unit.
-        @param device_id:
+        @param device:
         @param mode: The specified UserMode
         @param duration: optional. How many minutes/hours to run the mode
         """
         if mode in [UserModes.REFRESH, UserModes.AWAY, UserModes.CROWDED, UserModes.FIREPLACE, UserModes.HOLIDAY]:
             timer = {
-                UserModes.CROWDED: Register.USER_MODE_CROWDED_TIME,
-                UserModes.HOLIDAY: Register.USER_MODE_HOLIDAY_TIME,
-                UserModes.FIREPLACE: Register.USER_MODE_FIREPLACE_TIME,
-                UserModes.AWAY: Register.USER_MODE_AWAY_TIME,
-                UserModes.REFRESH: Register.USER_MODE_REFRESH_TIME
+                UserModes.CROWDED: Register.REG_USERMODE_CROWDED_TIME,
+                UserModes.HOLIDAY: Register.REG_USERMODE_HOLIDAY_TIME,
+                UserModes.FIREPLACE: Register.REG_USERMODE_FIREPLACE_TIME,
+                UserModes.AWAY: Register.REG_USERMODE_AWAY_TIME,
+                UserModes.REFRESH: Register.REG_USERMODE_REFRESH_TIME
             }
 
             await self.sc.write_data(
-                device_id=device_id,
+                device=device,
                 register=RegisterWrite(register=timer[mode], value=duration)
             )
 
         await self.sc.write_data(
-            device_id=device_id,
-            register=RegisterWrite(register=Register.USER_MODE_WRITE, value=mode)
+            device=device,
+            register=RegisterWrite(register=Register.REG_USERMODE_HMI_CHANGE_REQUEST, value=mode)
         )
 
 
@@ -128,7 +131,7 @@ class SaveConnect:
         """
         self.data = SaveConnectData()
         self.graphql = SaveConnectGraphQL(data=self.data)
-        self.auth = SaveConnectAuth()
+        self.auth = SaveConnectAuth(loop=loop)
         self.user_mode = SaveConnectUserMode(self)
         self.temperature = SaveConnectTemperature(self)
 
@@ -171,7 +174,8 @@ class SaveConnect:
                 if self.update_interval and now - last_update_time > self.update_interval:
                     _LOGGER.debug("Updating data according to update_interval.")
                     for device in await self.get_devices():
-                        await self.read_data(device_id=device["identifier"])
+
+                        await self.read_data(device=device)
 
                     last_update_time = time.time()
 
@@ -199,7 +203,7 @@ class SaveConnect:
             self.graphql.set_access_token(self.auth.token)
         return success
 
-    async def on_ws_data(self, data):
+    async def on_ws_data(self, data) -> bool:
         """
         Callback for retrieving DEVICE_PUSH_EVENT's via websockets
         @param data: the raw data from the WSS API
@@ -207,39 +211,50 @@ class SaveConnect:
         data_json = json.loads(data)
         payload = data_json["payload"]
         device_id = payload["deviceId"]
+
+        if "dataItems" not in payload:
+            _LOGGER.error("Could not retrieve dataItems from websocket API.")
+            return False
+
         data_items = payload["dataItems"]
+
         self.data.update(device_id, data_items)
 
-    async def read_data(self, device_id):
+        return True
+
+    async def read_data(self, device: SaveConnectDevice) -> bool:
         """
         Read all registers on a specific device
-        @param device_id: device ID
+        @param device: SaveConnectDevice object
         @return: the data that was retrieved from the API
         """
-        data = await self.graphql.queryGetDeviceData(device_id)
-        data = data["GetDeviceView"]["dataItems"]
-        return data
+        status = await self.graphql.queryGetDeviceData(device.identifier)
 
-    async def write_data(self, device_id, register: RegisterWrite, is_import=False):
+        return status
+
+    async def write_data(self, device: SaveConnectDevice, register: RegisterWrite, is_import=False):
         """
         Write data to a specified device
-        @param device_id: the device ID
+        @param device: the device
         @param register: which register to write to
         @param is_import: wether to import or not
         @return: response from API (updated state)
         """
-        return await self.graphql.queryWriteDeviceValues(
-            device_id=device_id,
+
+        data = await self.graphql.queryWriteDeviceValues(
+            device_id=device.identifier,
             register_pair=register,
             is_import=is_import
         )
+        return data
 
-    async def get_devices(self):
+    async def get_devices(self, update=True) -> typing.List[SaveConnectDevice]:
         """
         Retrieve all devices from the account query
         @return:
         """
-        data = await self.graphql.queryGetAccount()
-        return data["GetAccount"]["devices"]
-
+        if not update:
+            return list(self.data.devices.values())
+        devices = await self.graphql.queryGetAccount()
+        return devices
 

@@ -1,9 +1,11 @@
 import json
+import typing
 
 from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
 
 from systemair.saveconnect.data import SaveConnectData
+from systemair.saveconnect.models import SaveConnectDevice
 from systemair.saveconnect.registry import RegisterWrite
 
 
@@ -12,7 +14,7 @@ class SaveConnectGraphQL:
     def __init__(self, data: SaveConnectData):
         self.data: SaveConnectData = data
         transport = AIOHTTPTransport(url="https://homesolutions.systemair.com/gateway/api")
-        self.client = Client(transport=transport, fetch_schema_from_transport=True)
+        self.client = Client(transport=transport, fetch_schema_from_transport=True, execute_timeout=120)
 
     def set_access_token(self, _oidc_token):
         self.client.transport.headers = {
@@ -43,8 +45,7 @@ class SaveConnectGraphQL:
             variable_values=data
         )
 
-        self.data.update(device_id, response)
-        return response
+        return self.data.update(device_id, response)
 
     async def queryDeviceView(self, device_id, route):
         query = gql(
@@ -73,21 +74,19 @@ class SaveConnectGraphQL:
             variable_values=data
         )
 
-        self.data.update(device_id, response)
-
-        return response
+        return self.data.update(device_id, response)
 
     async def queryGetDeviceData(self, device_id, change_mode=False):
-        response = await self.queryDeviceView(
+        success = await self.queryDeviceView(
             device_id=device_id,
             route=f"/device/home{'' if not change_mode else '/changeMode'}"
         )
 
-        self.data.update(device_id, response)
 
-        return response
 
-    async def queryGetAccount(self):
+        return success
+
+    async def queryGetAccount(self) -> typing.List['SaveConnectDevice']:
         query = gql("""
             {
               GetAccount {
@@ -144,4 +143,9 @@ class SaveConnectGraphQL:
               }
             }
         """)
-        return await self.client.execute_async(query)
+        response = await self.client.execute_async(query)
+
+        for device_data in response["GetAccount"]["devices"]:
+            self.data.update_device(device_data=device_data)
+
+        return list(self.data.devices.values())
