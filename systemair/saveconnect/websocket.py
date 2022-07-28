@@ -28,6 +28,9 @@ class WSClient:
     def set_access_token(self, token):
         self._access_token = token["access_token"]
 
+    def is_connected(self):
+        return self.ws is not None
+
     async def listen_forever(self):
         while True:
             # outer loop restarted every time the connection fails
@@ -58,11 +61,13 @@ class WSClient:
                         if self.callback:
                             await self.callback(reply)
             except socket.gaierror:
+                self.ws = None
                 logger.debug(
                     'Socket error - retrying connection in {} sec...'.format(self.sleep_time))
                 await asyncio.sleep(self.sleep_time)
                 continue
             except ConnectionRefusedError:
+                self.ws = None
                 logger.debug('Nobody seems to listen to this endpoint. Please check the URL.')
                 logger.debug('Retrying connection in {} sec...'.format(self.sleep_time))
                 await asyncio.sleep(self.sleep_time)

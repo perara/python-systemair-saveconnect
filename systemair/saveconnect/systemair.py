@@ -175,7 +175,6 @@ class SaveConnect:
                 if 0 < self.update_interval < now - last_update_time:
                     _LOGGER.debug("Updating data according to update_interval.")
                     for device in await self.get_devices():
-
                         await self.read_data(device=device)
 
                     last_update_time = time.time()
@@ -189,7 +188,6 @@ class SaveConnect:
                     last_refresh_token_time = time.time()
 
             await asyncio.sleep(self.worker_interval)
-
 
     async def login(self):
         """
@@ -264,3 +262,10 @@ class SaveConnect:
 
         return devices
 
+    async def test_connectivity(self):
+        criteria = []
+
+        if self.ws_enabled:
+            criteria.append(self._ws.is_connected())
+
+        return all(criteria)

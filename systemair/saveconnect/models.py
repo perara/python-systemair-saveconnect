@@ -58,7 +58,7 @@ class SaveConnectDevice(BaseModel):
     registry: 'SaveConnectRegistry' = None
 
     async def update(self, api):
-        await api.read_data(self)
+        return await api.read_data(self)
 
 
 def update(self, data: Dict):

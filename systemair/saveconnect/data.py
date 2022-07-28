@@ -20,7 +20,6 @@ class SaveConnectData:
                     "registry": SaveConnectRegistry()
                 }
             )
-
         else:
             update(self.devices[device_data["identifier"]], device_data)
 
