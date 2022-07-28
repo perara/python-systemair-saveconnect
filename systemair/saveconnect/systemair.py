@@ -118,6 +118,7 @@ class SaveConnect:
                  refresh_token_interval=300,
                  worker_interval=5,
                  loop=asyncio.get_event_loop()
+
                  ):
         """
         Constructor of the SaveConnect API
@@ -171,7 +172,7 @@ class SaveConnect:
             now = time.time()
 
             if self.auth.is_auth():
-                if self.update_interval and now - last_update_time > self.update_interval:
+                if 0 < self.update_interval < now - last_update_time:
                     _LOGGER.debug("Updating data according to update_interval.")
                     for device in await self.get_devices():
 
@@ -179,7 +180,7 @@ class SaveConnect:
 
                     last_update_time = time.time()
 
-                if self.refresh_token_interval and now - last_refresh_token_time > self.refresh_token_interval:
+                if 0 < self.refresh_token_interval < now - last_refresh_token_time:
                     _LOGGER.debug("Refreshing access tokens")
                     await self.auth.refresh_token()
                     self._ws.set_access_token(self.auth.token)

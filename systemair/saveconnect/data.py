@@ -37,7 +37,7 @@ class SaveConnectData:
         elif "GetDeviceView" in data:
             data = data["GetDeviceView"]
 
-            if "dataItems" not in data:
+            if data is None or "dataItems" not in data:
                 _LOGGER.error("Could not update due to missing dataItems in the API response.")
                 return False
             data = data["dataItems"]
