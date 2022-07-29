@@ -73,7 +73,7 @@ class SaveConnectUserMode:
         @param mode:
         """
 
-        await self.sc.write_data(
+        return await self.sc.write_data(
             device=device,
             register=RegisterWrite(register=Register.REG_USERMODE_MANUAL_AIRFLOW_LEVEL_SAF, value=mode)
         )
@@ -99,7 +99,7 @@ class SaveConnectUserMode:
                 register=RegisterWrite(register=timer[mode], value=duration)
             )
 
-        await self.sc.write_data(
+        return await self.sc.write_data(
             device=device,
             register=RegisterWrite(register=Register.REG_USERMODE_HMI_CHANGE_REQUEST, value=mode)
         )
@@ -181,13 +181,17 @@ class SaveConnect:
 
                 if 0 < self.refresh_token_interval < now - last_refresh_token_time:
                     _LOGGER.debug("Refreshing access tokens")
-                    await self.auth.refresh_token()
-                    self._ws.set_access_token(self.auth.token)
-                    self.graphql.set_access_token(self.auth.token)
+                    await self.refresh_token()
 
                     last_refresh_token_time = time.time()
 
             await asyncio.sleep(self.worker_interval)
+
+    async def refresh_token(self):
+        _LOGGER.debug("Refreshing access tokens")
+        await self.auth.refresh_token()
+        self._ws.set_access_token(self.auth.token)
+        self.graphql.set_access_token(self.auth.token)
 
     async def login(self):
         """
@@ -253,14 +257,19 @@ class SaveConnect:
         @return:
         """
         if not update:
-            return list(self.data.devices.values())
-        devices = await self.graphql.queryGetAccount()
+            devices = list(self.data.devices.values())
+        else:
+            devices = await self.graphql.queryGetAccount()
 
         for device in devices:
             if fetch_device_info:
                 await self.graphql.queryDeviceInfo(device)
 
         return devices
+
+    async def update_device_info(self, devices):
+        for device in devices:
+            await self.graphql.queryDeviceInfo(device)
 
     async def test_connectivity(self):
         criteria = []

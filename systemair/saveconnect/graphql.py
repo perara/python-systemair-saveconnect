@@ -2,8 +2,10 @@ import json
 import logging
 import typing
 
+from aiohttp import ClientError
 from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.exceptions import TransportAlreadyConnected
 
 from systemair.saveconnect.data import SaveConnectData
 from systemair.saveconnect.models import SaveConnectDevice
@@ -18,7 +20,11 @@ class SaveConnectGraphQL:
     def __init__(self, data: SaveConnectData):
         self.data: SaveConnectData = data
         transport = AIOHTTPTransport(url="https://homesolutions.systemair.com/gateway/api")
-        self.client = Client(transport=transport, fetch_schema_from_transport=True, execute_timeout=120)
+        self.client = Client(
+            transport=transport,
+            fetch_schema_from_transport=True,
+            execute_timeout=120
+        )
 
     def set_access_token(self, _oidc_token):
         self.client.transport.headers = {
@@ -73,10 +79,13 @@ class SaveConnectGraphQL:
             )
         )
 
-        response = await self.client.execute_async(
-            query,
-            variable_values=data
-        )
+        try:
+            response = await self.client.execute_async(
+                query,
+                variable_values=data
+            )
+        except TransportAlreadyConnected as e:
+            raise ClientError(e)
 
         return self.data.update(device_id, response)
 
@@ -159,9 +168,10 @@ class SaveConnectGraphQL:
             APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_INPUT_STATUS_DESC,
             APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_OUTPUT_STATUS_DESC,
             APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_DATE_TIME_TITLE,
-            APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_VERSION_DESC
+            APIRoutes.VIEWS_UNIT_INFORMATION_UNIT_VERSION_DESC,
         ]:
             status = await self.queryDeviceView(device.identifier, route)
+
 
             if not status:
                 _LOGGER.error(f"queryDeviceInfo failed for route={route}")

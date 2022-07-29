@@ -48,6 +48,10 @@ class SaveConnectData:
             for x in data if str(x["register"]) in Register.map
         }
 
+        for cb in self.devices[device_id].cb:
+            for parse_item in parsed_data.values():
+                cb(parse_item.register_, parse_item.value, parse_item)
+
         _LOGGER.debug(f"Updating {len(parsed_data)} registers for device '{device_id}'...")
 
         # Update existing registry

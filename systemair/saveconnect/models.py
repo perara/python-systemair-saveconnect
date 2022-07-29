@@ -57,8 +57,13 @@ class SaveConnectDevice(BaseModel):
     units: SaveConnectDeviceUnits
     registry: 'SaveConnectRegistry' = None
 
+    cb = []
+
     async def update(self, api):
         return await api.read_data(self)
+
+    def add_update_callback(self, cb):
+        self.cb.append(cb)
 
 
 def update(self, data: Dict):
