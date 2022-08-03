@@ -3,13 +3,16 @@ import asyncio
 import websockets
 import logging
 
+from websockets.exceptions import InvalidStatusCode
+
 logger = logging.getLogger(__name__)
 
 
 class WSClient:
 
-    def __init__(self, url, loop=asyncio.get_event_loop(), **kwargs):
+    def __init__(self, saveconnect, url, loop=asyncio.get_event_loop(), **kwargs):
         self.url = url
+        self.saveconnect = saveconnect
         self.ws = None
         self._access_token = None
         self.loop = loop
@@ -18,6 +21,9 @@ class WSClient:
         self.ping_timeout = kwargs.get('ping_timeout') or 5
         self.sleep_time = kwargs.get('sleep_time') or 5
         self.callback = kwargs.get('callback')
+
+    def set_callback(self, cb):
+        self.callback = cb
 
     async def connect(self):
         self.loop.create_task(self.listen_forever())
@@ -72,3 +78,12 @@ class WSClient:
                 logger.debug('Retrying connection in {} sec...'.format(self.sleep_time))
                 await asyncio.sleep(self.sleep_time)
                 continue
+            except InvalidStatusCode as e:
+                self.ws = None
+                logger.error(f"Could not connect to the websocket API. Go code: {e.status_code}")
+
+                if e.status_code == 401:
+                    # Unauthorized
+                    await self.saveconnect.refresh_token()
+
+                await asyncio.sleep(self.sleep_time)

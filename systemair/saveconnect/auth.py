@@ -1,5 +1,5 @@
+import time
 import httpx
-from keycloak import KeycloakOpenID
 from bs4 import BeautifulSoup
 
 
@@ -12,53 +12,74 @@ class SaveConnectAuth:
         self._oidc_token: dict = {}
         self.loop = loop
 
-    async def auth_openid(self):
-        return KeycloakOpenID(server_url="https://sso.systemair.com/auth/",
-                              client_id="iot-application",
-                              realm_name="iot")
+        self._token_expiry = time.time()
 
     async def auth(self, email, password):
-        # Configure client
-        keycloak_openid = await self.auth_openid()
+        auth_url = (
+            "{authorization-endpoint}?client_id={client-id}&response_type={response_type}&redirect_uri={redirect-uri}"
+            "&scope={scope}&state={state}"
+        ).format(**{
+            "authorization-endpoint": "https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/auth",
+            "client-id": "iot-application",
+            "response_type": "code",
+            "redirect-uri": "https://homesolutions.systemair.com",
+            "scope": "openid email profile",
+            "state": "xyzABC123"
+        })
 
-        # Get Code With Oauth Authorization Request
-        auth_url = await self.loop.run_in_executor(None, lambda : keycloak_openid.auth_url(
-            redirect_uri="https://homesolutions.systemair.com",
-            scope="openid",
-            state="xyzABC123"))
+        response = await self._client.get(auth_url, follow_redirects=True)
 
-        r1 = await self._client.get(auth_url, follow_redirects=True)
+        soup = BeautifulSoup(response.content, features="html.parser")
 
-        soup = BeautifulSoup(r1.content, features="html.parser")
-
-        login_form = soup.find("form", {
+        login_form_action = soup.find("form", {
             "id": "kc-form-login"
         })["action"]
 
-        r2 = await self._client.post(login_form, data=dict(
+        response = await self._client.post(login_form_action, data=dict(
             username=email,
             password=password,
             rememberMe="on",
             credentialId=""
         ), follow_redirects=True)
+        code = response.url.params.get("code")
 
         # Get Access Token With Code
-        self._oidc_token = await self.loop.run_in_executor(None, lambda: keycloak_openid.token(
-            grant_type='authorization_code',
-            code=r2.url.params["code"],
-            redirect_uri="https://homesolutions.systemair.com"))
+        response = await self._client.post(
+            url="https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/token",
+            headers={
+                "content-type": "application/x-www-form-urlencoded"
+            },
+            data={
+                "grant_type": "authorization_code",
+                "client_id": "iot-application",
+                "code": code,
+                "redirect_uri": "https://homesolutions.systemair.com"
+            }
+        )
+
+        self._oidc_token = response.json()
 
         return True if self._oidc_token else False
 
     async def refresh_token(self):
-        keycloak_openid = await self.auth_openid()
+        response = await self._client.post(
+            url="https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/token",
+            headers={
+                "content-type": "application/x-www-form-urlencoded"
+            },
+            data={
+                "grant_type": "refresh_token",
+                "client_id": "iot-application",
+                "refresh_token": self._oidc_token["refresh_token"],
+                "redirect_uri": "https://homesolutions.systemair.com"
+            }
+        )
+        self._oidc_token = response.json()
 
-        self._oidc_token = await self.loop.run_in_executor(None, lambda: keycloak_openid.refresh_token(
-            grant_type='refresh_token',
-            refresh_token=self._oidc_token["refresh_token"]))
+        self._token_expiry = time.time() + self._oidc_token["expires_in"] - (self._oidc_token["expires_in"] * .20)
 
     def is_auth(self):
-        return len(self._oidc_token) > 0
+        return self._token_expiry < time.time() and len(self._oidc_token) > 0
 
     @property
     def token(self):
@@ -67,4 +88,3 @@ class SaveConnectAuth:
     @token.setter
     def token(self, token):
         self._oidc_token = token
-

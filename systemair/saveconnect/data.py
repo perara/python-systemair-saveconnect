@@ -70,3 +70,12 @@ class SaveConnectData:
             return register_value
 
         return register_data
+
+    def set_availability(self, device_id, available):
+        if device_id not in self.devices:
+            return
+
+        self.devices[device_id].connectionStatus = "ONLINE" if available else "OFFLINE"
+
+    def get_device(self, device_id):
+        return self.devices[device_id]

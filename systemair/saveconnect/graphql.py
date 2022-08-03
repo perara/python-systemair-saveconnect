@@ -1,13 +1,10 @@
 import json
 import logging
 import typing
+from json import JSONDecodeError
 
-from aiohttp import ClientError
-from gql import gql, Client
-from gql.transport.aiohttp import AIOHTTPTransport
-from gql.transport.exceptions import TransportAlreadyConnected
+import httpx
 
-from systemair.saveconnect.data import SaveConnectData
 from systemair.saveconnect.models import SaveConnectDevice
 from systemair.saveconnect.registry import RegisterWrite
 from .const import APIRoutes
@@ -17,28 +14,25 @@ _LOGGER = logging.getLogger(__name__)
 
 class SaveConnectGraphQL:
 
-    def __init__(self, data: SaveConnectData):
-        self.data: SaveConnectData = data
-        transport = AIOHTTPTransport(url="https://homesolutions.systemair.com/gateway/api")
-        self.client = Client(
-            transport=transport,
-            fetch_schema_from_transport=True,
-            execute_timeout=120
-        )
+    def __init__(self, api: "SaveConnect"):
+        self.api = api
+        self.client: httpx.AsyncClient = httpx.AsyncClient()
+        self.headers = {
+            "content-type": "application/json",
+            "x-access-token": None
+        }
+        self.api_url = "https://homesolutions.systemair.com/gateway/api"
 
     def set_access_token(self, _oidc_token):
-        self.client.transport.headers = {
-            "x-access-token": _oidc_token["access_token"]
-        }
+        self.headers["x-access-token"] = _oidc_token["access_token"]
 
     async def queryWriteDeviceValues(self, device_id, register_pair: RegisterWrite, is_import=False):
-        query = gql(
-            """
+
+        query = """
                 mutation ($input: WriteDeviceValuesInputType!) {
                   WriteDeviceValues(input: $input)
                 }
             """
-        )
 
         data = dict(
             input={
@@ -50,16 +44,17 @@ class SaveConnectGraphQL:
             }
         )
 
-        response = await self.client.execute_async(
-            query,
-            variable_values=data
+        response_data = await self.post_request(
+            url=self.api_url,
+            data=dict(query=query, variables=data),
+            headers=self.headers
         )
 
-        return self.data.update(device_id, response)
+        return self.api.data.update(device_id, response_data)
 
     async def queryDeviceView(self, device_id, route):
-        query = gql(
-            """
+
+        query = """
             mutation ($input: GetDeviceViewInput!) {
               GetDeviceView(input: $input) {
                 route
@@ -69,9 +64,7 @@ class SaveConnectGraphQL:
                 translationVariables
               }
             }
-            """,
-        )
-
+        """
         data = dict(
             input=dict(
                 deviceId=device_id,
@@ -79,15 +72,13 @@ class SaveConnectGraphQL:
             )
         )
 
-        try:
-            response = await self.client.execute_async(
-                query,
-                variable_values=data
-            )
-        except TransportAlreadyConnected as e:
-            raise ClientError(e)
+        response_data = await self.post_request(
+            url=self.api_url,
+            data=dict(query=query, variables=data),
+            headers=self.headers
+        )
 
-        return self.data.update(device_id, response)
+        return self.api.data.update(device_id, response_data)
 
     async def queryGetDeviceData(self, device_id, change_mode=False):
         success = await self.queryDeviceView(
@@ -97,7 +88,7 @@ class SaveConnectGraphQL:
         return success
 
     async def queryGetAccount(self) -> typing.List['SaveConnectDevice']:
-        query = gql("""
+        query = """
             {
               GetAccount {
                 email
@@ -152,13 +143,18 @@ class SaveConnectGraphQL:
                 }
               }
             }
-        """)
-        response = await self.client.execute_async(query)
+        """
 
-        for device_data in response["GetAccount"]["devices"]:
-            self.data.update_device(device_data=device_data)
+        response_data = await self.post_request(
+            url=self.api_url,
+            data=dict(query=query, variables={}),
+            headers=self.headers
+        )
 
-        return list(self.data.devices.values())
+        for device_data in response_data["GetAccount"]["devices"]:
+            self.api.data.update_device(device_data=device_data)
+
+        return list(self.api.data.devices.values())
 
     async def queryDeviceInfo(self, device: SaveConnectDevice):
         statuses = []
@@ -172,9 +168,29 @@ class SaveConnectGraphQL:
         ]:
             status = await self.queryDeviceView(device.identifier, route)
 
-
             if not status:
                 _LOGGER.error(f"queryDeviceInfo failed for route={route}")
             statuses.append(status)
 
         return all(statuses)
+
+    async def post_request(self, url, data, headers, retry=False):
+
+        response = await self.client.post(
+            url=url,
+            json=data,
+            headers=headers
+        )
+
+        try:
+            response_data = response.json()["data"]
+            return response_data
+        except JSONDecodeError as e:
+
+            if not retry and "UnauthorizedError" in response.text:
+                _LOGGER.error("Response indicates token expiry. Refreshing token and retry")
+                await self.api.refresh_token()
+                return await self.post_request(url, data, headers, retry=True)
+
+            _LOGGER.error(f"Could not parse JSON. Content: {response.content}")
+            raise e

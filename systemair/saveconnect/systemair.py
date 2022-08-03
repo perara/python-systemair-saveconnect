@@ -131,12 +131,12 @@ class SaveConnect:
         @param refresh_token_interval: Refresh interval of the access_token
         """
         self.data = SaveConnectData()
-        self.graphql = SaveConnectGraphQL(data=self.data)
+        self.graphql = SaveConnectGraphQL(self)
         self.auth = SaveConnectAuth(loop=loop)
         self.user_mode = SaveConnectUserMode(self)
         self.temperature = SaveConnectTemperature(self)
 
-        self._ws = WSClient(url=wss_url, callback=self.on_ws_data, loop=loop)
+        self._ws = WSClient(self, url=wss_url, callback=self.on_ws_data, loop=loop)
 
         """URL for the savecair API."""
         self.url = url
@@ -214,14 +214,31 @@ class SaveConnect:
         data_json = json.loads(data)
         payload = data_json["payload"]
         device_id = payload["deviceId"]
+        message_type = data_json["type"]
 
-        if "dataItems" not in payload:
-            _LOGGER.error("Could not retrieve dataItems from websocket API.")
+        if message_type == "DEVICE_CONNECTED":
+            self.data.set_availability(device_id, available=True)
+        elif message_type == "DEVICE_DISCONNECTED":
+            self.data.set_availability(device_id, available=False)
+        elif message_type == "DEVICE_PUSH_EVENT":
+            if "dataItems" not in payload:
+                _LOGGER.error("Could not retrieve dataItems from websocket API.")
+                return False
+
+            data_items = payload["dataItems"]
+            print(data_json)
+            self.data.update(device_id, data_items)
+
+            # Finally poll for updates
+
+            try:
+                device = self.data.get_device(device_id=device_id)
+                await self.read_data(device=device)
+            except KeyError:
+                _LOGGER.debug(f"Could not find device with ID={device_id} when polling data in WS.")
+        else:
+            _LOGGER.error(f"Unhandled message type for WS connection: {message_type}")
             return False
-
-        data_items = payload["dataItems"]
-
-        self.data.update(device_id, data_items)
 
         return True
 
@@ -231,6 +248,9 @@ class SaveConnect:
         @param device: SaveConnectDevice object
         @return: the data that was retrieved from the API
         """
+        if not self.auth.is_auth():
+            await self.refresh_token()
+
         status = await self.graphql.queryGetDeviceData(device.identifier)
 
         return status
