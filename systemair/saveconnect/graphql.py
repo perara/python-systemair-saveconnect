@@ -15,10 +15,10 @@ _LOGGER = logging.getLogger(__name__)
 
 class SaveConnectGraphQL:
 
-    def __init__(self, api: "SaveConnect"):
+    def __init__(self, api):
         self.api = api
         transport = httpx.AsyncHTTPTransport(retries=api.http_retries)
-        self._http: httpx.AsyncClient = httpx.AsyncClient(timeout=300)
+        self._http: httpx.AsyncClient = httpx.AsyncClient(timeout=300, transport=transport)
         self.headers = {
             "content-type": "application/json",
             "x-access-token": None
@@ -29,7 +29,13 @@ class SaveConnectGraphQL:
         self.headers["x-access-token"] = _oidc_token["access_token"]
 
     async def queryWriteDeviceValues(self, device_id, register_pair: RegisterWrite, is_import=False):
-
+        """
+        Runs the GQL query for writing to the device.
+        @param device_id:
+        @param register_pair:
+        @param is_import:
+        @return:
+        """
         query = """
                 mutation ($input: WriteDeviceValuesInputType!) {
                   WriteDeviceValues(input: $input)
@@ -147,7 +153,6 @@ class SaveConnectGraphQL:
             }
         """
 
-
         response_data = await self.post_request(
             url=self.api_url,
             data=dict(query=query, variables={}),
@@ -183,8 +188,6 @@ class SaveConnectGraphQL:
 
     async def post_request(self, url, data, headers, retry=False):
 
-
-
         try:
             response = await self._http.post(
                 url=url,
@@ -193,12 +196,11 @@ class SaveConnectGraphQL:
             )
 
         except TimeoutError as e:
-            _LOGGER.warning("Got timeout error when reading API")
+            _LOGGER.warning(f"Got timeout error when reading API. Error: {e}")
             return None
         except httpx.ConnectError as e:
-            _LOGGER.warning("Failed to connect to the API")
+            _LOGGER.warning(f"Failed to connect to the API. Error: {e}")
             return None
-
 
         try:
             response_data = response.json()["data"]

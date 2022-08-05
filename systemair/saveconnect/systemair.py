@@ -129,7 +129,7 @@ class SaveConnect:
         @param wss_url:  location of the SaveConnect WSS API
         @param update_interval: interval of how often to update via REST API
         @param refresh_token_interval: Refresh interval of the access_token
-        @param connection_retries: Number of times a http request is retried
+        @param http_retries: Number of times a http request is retried
         """
 
         self._http_retries = http_retries

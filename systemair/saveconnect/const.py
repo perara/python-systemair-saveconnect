@@ -22,6 +22,7 @@ class Airflow:
     HIGH = "high"
     MAXIMUM = "maximum"
 
+
 class UserModes:
     AUTO = "auto"
     MANUAL = "manual"
@@ -40,4 +41,3 @@ class APIRoutes:
     VIEWS_UNIT_INFORMATION_UNIT_DATE_TIME_TITLE = "/device/unit_information/date_time"
     VIEWS_UNIT_INFORMATION_UNIT_VERSION_DESC = "/device/unit_information/unit_version"
     ACTIVE_ALARMS = "/device/alarms/active_alarms"
-
