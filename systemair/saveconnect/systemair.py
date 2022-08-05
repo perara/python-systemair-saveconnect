@@ -117,8 +117,8 @@ class SaveConnect:
                  update_interval=60,
                  refresh_token_interval=300,
                  worker_interval=5,
-                 loop=asyncio.get_event_loop()
-
+                 loop=asyncio.get_event_loop(),
+                 http_retries=10
                  ):
         """
         Constructor of the SaveConnect API
@@ -129,10 +129,14 @@ class SaveConnect:
         @param wss_url:  location of the SaveConnect WSS API
         @param update_interval: interval of how often to update via REST API
         @param refresh_token_interval: Refresh interval of the access_token
+        @param connection_retries: Number of times a http request is retried
         """
+
+        self._http_retries = http_retries
+
         self.data = SaveConnectData()
         self.graphql = SaveConnectGraphQL(self)
-        self.auth = SaveConnectAuth(loop=loop)
+        self.auth = SaveConnectAuth(self)
         self.user_mode = SaveConnectUserMode(self)
         self.temperature = SaveConnectTemperature(self)
 
@@ -164,6 +168,10 @@ class SaveConnect:
 
         """Run async loop for updating sensors and refresh token."""
         loop.create_task(self.worker())
+
+    @property
+    def http_retries(self):
+        return self._http_retries
 
     async def worker(self):
         last_update_time = time.time()
@@ -222,11 +230,10 @@ class SaveConnect:
             self.data.set_availability(device_id, available=False)
         elif message_type == "DEVICE_PUSH_EVENT":
             if "dataItems" not in payload:
-                _LOGGER.error("Could not retrieve dataItems from websocket API.")
+                _LOGGER.warning("Could not retrieve dataItems from websocket API.")
                 return False
 
             data_items = payload["dataItems"]
-            print(data_json)
             self.data.update(device_id, data_items)
 
             # Finally poll for updates
@@ -237,7 +244,7 @@ class SaveConnect:
             except KeyError:
                 _LOGGER.debug(f"Could not find device with ID={device_id} when polling data in WS.")
         else:
-            _LOGGER.error(f"Unhandled message type for WS connection: {message_type}")
+            _LOGGER.warning(f"Unhandled message type for WS connection: {message_type}")
             return False
 
         return True

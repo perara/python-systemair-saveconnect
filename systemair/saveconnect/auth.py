@@ -5,12 +5,12 @@ from bs4 import BeautifulSoup
 
 class SaveConnectAuth:
 
-    def __init__(self, loop):
+    def __init__(self, api: "SaveConnect"):
         """HTTP Client"""
         # self._cookie_jar = aiohttp.CookieJar(unsafe=True)
-        self._client: httpx.AsyncClient = httpx.AsyncClient()
+        transport = httpx.AsyncHTTPTransport(retries=api.http_retries)
+        self._http: httpx.AsyncClient = httpx.AsyncClient(transport=transport)
         self._oidc_token: dict = {}
-        self.loop = loop
 
         self._token_expiry = time.time()
 
@@ -27,7 +27,7 @@ class SaveConnectAuth:
             "state": "xyzABC123"
         })
 
-        response = await self._client.get(auth_url, follow_redirects=True)
+        response = await self._http.get(auth_url, follow_redirects=True)
 
         soup = BeautifulSoup(response.content, features="html.parser")
 
@@ -35,7 +35,7 @@ class SaveConnectAuth:
             "id": "kc-form-login"
         })["action"]
 
-        response = await self._client.post(login_form_action, data=dict(
+        response = await self._http.post(login_form_action, data=dict(
             username=email,
             password=password,
             rememberMe="on",
@@ -44,7 +44,7 @@ class SaveConnectAuth:
         code = response.url.params.get("code")
 
         # Get Access Token With Code
-        response = await self._client.post(
+        response = await self._http.post(
             url="https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/token",
             headers={
                 "content-type": "application/x-www-form-urlencoded"
@@ -61,23 +61,26 @@ class SaveConnectAuth:
 
         return True if self._oidc_token else False
 
-    async def refresh_token(self):
-        response = await self._client.post(
-            url="https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/token",
-            headers={
-                "content-type": "application/x-www-form-urlencoded"
-            },
-            data={
-                "grant_type": "refresh_token",
-                "client_id": "iot-application",
-                "refresh_token": self._oidc_token["refresh_token"],
-                "redirect_uri": "https://homesolutions.systemair.com"
-            }
-        )
-        self._oidc_token = response.json()
+    async def refresh_token(self, retry=0):
+        try:
 
-        self._token_expiry = time.time() + self._oidc_token["expires_in"] - (self._oidc_token["expires_in"] * .20)
+            response = await self._http.post(
+                url="https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/token",
+                headers={
+                    "content-type": "application/x-www-form-urlencoded"
+                },
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": "iot-application",
+                    "refresh_token": self._oidc_token["refresh_token"],
+                    "redirect_uri": "https://homesolutions.systemair.com"
+                }
+            )
+            self._oidc_token = response.json()
 
+            self._token_expiry = time.time() + self._oidc_token["expires_in"] - (self._oidc_token["expires_in"] * .20)
+        except httpx.ConnectTimeout:
+            _LOGGER.info("Recieved connection timeout while refreshing token")
     def is_auth(self):
         return self._token_expiry < time.time() and len(self._oidc_token) > 0
 

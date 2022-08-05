@@ -16,7 +16,8 @@ class SaveConnectGraphQL:
 
     def __init__(self, api: "SaveConnect"):
         self.api = api
-        self.client: httpx.AsyncClient = httpx.AsyncClient()
+        transport = httpx.AsyncHTTPTransport(retries=api.http_retries)
+        self._http: httpx.AsyncClient = httpx.AsyncClient(timeout=300)
         self.headers = {
             "content-type": "application/json",
             "x-access-token": None
@@ -145,11 +146,16 @@ class SaveConnectGraphQL:
             }
         """
 
+
         response_data = await self.post_request(
             url=self.api_url,
             data=dict(query=query, variables={}),
             headers=self.headers
         )
+
+        if response_data is None:
+            _LOGGER.error("No data from the API")
+            return []
 
         for device_data in response_data["GetAccount"]["devices"]:
             self.api.data.update_device(device_data=device_data)
@@ -176,11 +182,22 @@ class SaveConnectGraphQL:
 
     async def post_request(self, url, data, headers, retry=False):
 
-        response = await self.client.post(
-            url=url,
-            json=data,
-            headers=headers
-        )
+
+
+        try:
+            response = await self._http.post(
+                url=url,
+                json=data,
+                headers=headers
+            )
+
+        except TimeoutError as e:
+            _LOGGER.warning("Got timeout error when reading API")
+            return None
+        except httpx.ConnectError as e:
+            _LOGGER.warning("Failed to connect to the API")
+            return None
+
 
         try:
             response_data = response.json()["data"]
@@ -188,9 +205,9 @@ class SaveConnectGraphQL:
         except JSONDecodeError as e:
 
             if not retry and "UnauthorizedError" in response.text:
-                _LOGGER.error("Response indicates token expiry. Refreshing token and retry")
+                _LOGGER.warning("Response indicates token expiry. Refreshing token and retry")
                 await self.api.refresh_token()
                 return await self.post_request(url, data, headers, retry=True)
 
-            _LOGGER.error(f"Could not parse JSON. Content: {response.content}")
+            _LOGGER.warning(f"Could not parse JSON. Content: {response.content}")
             raise e

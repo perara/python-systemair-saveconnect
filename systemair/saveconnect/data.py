@@ -24,12 +24,15 @@ class SaveConnectData:
             update(self.devices[device_data["identifier"]], device_data)
 
     def update(self, device_id, data):
+
         if device_id not in self.devices:
             self.devices[device_id] = SaveConnectDevice.parse_obj({
                 "registry": SaveConnectRegistry()
             })
 
-        if "WriteDeviceValues" in data:
+        if data is None:
+            return False
+        elif "WriteDeviceValues" in data:
             data = data["WriteDeviceValues"]
             if data is None:
                 data = []
@@ -37,7 +40,7 @@ class SaveConnectData:
             data = data["GetDeviceView"]
 
             if data is None or "dataItems" not in data:
-                _LOGGER.error("Could not update due to missing dataItems in the API response.")
+                _LOGGER.warning("Could not update due to missing dataItems in the API response.")
                 return False
             data = data["dataItems"]
 
