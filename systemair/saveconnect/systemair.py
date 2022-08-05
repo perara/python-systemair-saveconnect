@@ -8,7 +8,7 @@ import time
 import typing
 
 from .auth import SaveConnectAuth
-from .const import UserModes, Airflow
+from .const import Airflow, UserModes
 from .data import SaveConnectData
 from .graphql import SaveConnectGraphQL
 from .models import SaveConnectDevice

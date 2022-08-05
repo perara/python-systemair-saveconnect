@@ -1,7 +1,8 @@
 import logging
 import typing
 
-from systemair.saveconnect.models import SaveConnectDevice, SaveConnectRegisterItem, update
+from systemair.saveconnect.models import (SaveConnectDevice,
+                                          SaveConnectRegisterItem, update)
 from systemair.saveconnect.register import Register, SaveConnectRegistry
 
 _LOGGER = logging.getLogger(__name__)

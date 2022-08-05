@@ -1,7 +1,7 @@
 import sys
 from typing import Dict
 
-from pydantic import BaseModel, typing, Field
+from pydantic import BaseModel, Field, typing
 
 
 class SaveConnectDeviceUnits(BaseModel):

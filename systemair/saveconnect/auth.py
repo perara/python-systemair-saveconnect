@@ -1,11 +1,15 @@
+import logging
 import time
+
 import httpx
 from bs4 import BeautifulSoup
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SaveConnectAuth:
 
-    def __init__(self, api: "SaveConnect"):
+    def __init__(self, api):
         """HTTP Client"""
         # self._cookie_jar = aiohttp.CookieJar(unsafe=True)
         transport = httpx.AsyncHTTPTransport(retries=api.http_retries)
@@ -61,7 +65,7 @@ class SaveConnectAuth:
 
         return True if self._oidc_token else False
 
-    async def refresh_token(self, retry=0):
+    async def refresh_token(self):
         try:
 
             response = await self._http.post(
@@ -80,7 +84,8 @@ class SaveConnectAuth:
 
             self._token_expiry = time.time() + self._oidc_token["expires_in"] - (self._oidc_token["expires_in"] * .20)
         except httpx.ConnectTimeout:
-            _LOGGER.info("Recieved connection timeout while refreshing token")
+            _LOGGER.info("Received connection timeout while refreshing token")
+
     def is_auth(self):
         return self._token_expiry < time.time() and len(self._oidc_token) > 0
 

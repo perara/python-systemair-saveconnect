@@ -1345,7 +1345,9 @@ class Register:
         "242424": "REG_USERMODE_DUMMY_MANUAL"
 }
 import typing
+
 from pydantic import BaseModel
+
 
 class SaveConnectRegistry(BaseModel):
 

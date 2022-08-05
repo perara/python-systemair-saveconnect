@@ -1,8 +1,8 @@
-import socket
 import asyncio
-import websockets
 import logging
+import socket
 
+import websockets
 from websockets.exceptions import InvalidStatusCode
 
 logger = logging.getLogger(__name__)

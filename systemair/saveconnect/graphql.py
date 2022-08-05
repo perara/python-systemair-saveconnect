@@ -7,6 +7,7 @@ import httpx
 
 from systemair.saveconnect.models import SaveConnectDevice
 from systemair.saveconnect.registry import RegisterWrite
+
 from .const import APIRoutes
 
 _LOGGER = logging.getLogger(__name__)
